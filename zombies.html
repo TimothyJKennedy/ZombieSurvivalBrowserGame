@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zombies Ate My Neighbors Clone</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222;
+        }
+        #gameCanvas {
+            background-color: #87CEEB; /* Light blue sky */
+        }
+        #menu {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        #menu button {
+            padding: 10px 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>Tim's Zombie Survival Game</h1>
+        <button id="startButton">Start</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const menu = document.getElementById('menu');
+        const startButton = document.getElementById('startButton');
+    
+        let gameState = 'menu';
+        let player, zombies, bullets, score, gameOverAnim, zombieSpawnInterval, animationFrameId;
+        const keys = {};
+    
+        window.addEventListener('keydown', (e) => keys[e.key] = true);
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
+    
+        function initGame() {
+            player = { x: 400, y: 300, speed: 5, width: 20, height: 20, health: 100, direction: 'right' };
+            zombies = [];
+            bullets = [];
+            score = 0;
+            gameOverAnim = 0;
+            gameState = 'playing';
+            ctx.textAlign = 'left';
+            ctx.font = '20px Arial';
+            spawnZombies();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+    
+        startButton.addEventListener('click', () => {
+            menu.style.display = 'none';
+            initGame();
+        });
+    
+        function createBullet() {
+            let x = player.x + player.width / 2;
+            let y = player.y + player.height / 2;
+            if (player.direction === 'up') y = player.y;
+            else if (player.direction === 'down') y = player.y + player.height;
+            else if (player.direction === 'left') x = player.x;
+            else if (player.direction === 'right') x = player.x + player.width;
+            return { x, y, speed: 10, width: 5, height: 5, direction: player.direction };
+        }
+    
+        function createZombie() {
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            if (side === 0) { x = Math.random() * canvas.width; y = -20; }
+            else if (side === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; }
+            else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
+            else { x = -20; y = Math.random() * canvas.height; }
+            return { x, y, width: 20, height: 20, speed: 1 };
+        }
+    
+        function spawnZombies() {
+            if (zombieSpawnInterval) clearInterval(zombieSpawnInterval);
+            zombieSpawnInterval = setInterval(() => {
+                if (gameState === 'playing' && zombies.length < 10) {
+                    zombies.push(createZombie());
+                }
+            }, 2000);
+        }
+    
+        function collides(a, b) {
+            return a.x < b.x + b.width && a.x + a.width > b.x &&
+                   a.y < b.y + b.height && a.y + a.height > b.y;
+        }
+    
+        function update() {
+            if (keys['ArrowUp']) { player.y -= player.speed; player.direction = 'up'; }
+            if (keys['ArrowDown']) { player.y += player.speed; player.direction = 'down'; }
+            if (keys['ArrowLeft']) { player.x -= player.speed; player.direction = 'left'; }
+            if (keys['ArrowRight']) { player.x += player.speed; player.direction = 'right'; }
+    
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+    
+            if (keys[' '] && !keys['spacePressed']) {
+                bullets.push(createBullet());
+                keys['spacePressed'] = true;
+            }
+            if (!keys[' ']) keys['spacePressed'] = false;
+    
+            bullets.forEach((bullet, i) => {
+                if (bullet.direction === 'up') bullet.y -= bullet.speed;
+                else if (bullet.direction === 'down') bullet.y += bullet.speed;
+                else if (bullet.direction === 'left') bullet.x -= bullet.speed;
+                else if (bullet.direction === 'right') bullet.x += bullet.speed;
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            });
+    
+            zombies.forEach((zombie, i) => {
+                const dx = player.x - zombie.x;
+                const dy = player.y - zombie.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                zombie.x += (dx / dist) * zombie.speed;
+                zombie.y += (dy / dist) * zombie.speed;
+    
+                if (collides(player, zombie)) {
+                    player.health -= 10;
+                    zombies.splice(i, 1);
+                    if (player.health <= 0) gameState = 'gameover';
+                }
+    
+                bullets.forEach((bullet, j) => {
+                    if (collides(bullet, zombie)) {
+                        zombies.splice(i, 1);
+                        bullets.splice(j, 1);
+                        score += 1;
+                    }
+                });
+            });
+        }
+    
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'blue';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+    
+            ctx.fillStyle = 'cyan';
+            bullets.forEach(bullet => ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height));
+    
+            ctx.fillStyle = 'green';
+            zombies.forEach(zombie => ctx.fillRect(zombie.x, zombie.y, zombie.width, zombie.height));
+    
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'left';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+            ctx.fillText(`Health: ${player.health}`, 10, 60);
+        }
+    
+        function drawGameOver() {
+            ctx.fillStyle = 'black';
+            if (gameOverAnim < canvas.height) {
+                ctx.fillRect(0, 0, canvas.width, gameOverAnim);
+                gameOverAnim += 10;
+            } else {
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+    
+                // Draw "Return to Title Menu" button
+                ctx.fillStyle = 'gray';
+                ctx.fillRect(canvas.width / 2 - 100, canvas.height / 2 + 20, 200, 40);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.fillText('Return to Title Menu', canvas.width / 2, canvas.height / 2 + 45);
+            }
+        }
+    
+        // Handle canvas clicks for the button
+        canvas.addEventListener('click', (e) => {
+            if (gameState === 'gameover' && gameOverAnim >= canvas.height) {
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                const buttonX = canvas.width / 2 - 100;
+                const buttonY = canvas.height / 2 + 20;
+                const buttonWidth = 200;
+                const buttonHeight = 40;
+    
+                if (clickX >= buttonX && clickX <= buttonX + buttonWidth &&
+                    clickY >= buttonY && clickY <= buttonY + buttonHeight) {
+                    gameState = 'menu';
+                    menu.style.display = 'block';
+                    clearInterval(zombieSpawnInterval);
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+        });
+    
+        function gameLoop() {
+            if (gameState === 'playing') {
+                update();
+                draw();
+            } else if (gameState === 'gameover') {
+                drawGameOver();
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
