@@ -4,5 +4,7 @@ Created by Timothy Kennedy
 Date: 2/21/25
 
 Controls:
+
 MOVEMENT:   ARROW KEYS
+
 SHOOT:      SPACEBAR
